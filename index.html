@@ -1,179 +1,113 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Object Detection with Camera</title>
     <style>
-      #results {
-	  position: fixed;
-	  top: 50px;
-	  left: 10px;
-	  color: white;
+      #predictions {
+        position: fixed;
+        top: 50px;
+        left: 10px;
+        color: white;
+        font-size: 16px;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 10px;
+        border-radius: 5px;
       }
 
-      #results span {
-	  margin: 5px 5px;
+      #predictions p {
+        margin: 5px 0;
       }
-      
+
       video {
-	  position: fixed;
-	  top: 0;
-	  left: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 50%;
+        height: auto;
+        z-index: -1;
       }
 
       h1 {
-	  position: fixed;
-	  bottom: 0;
-	  left: 0;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        color: white;
+        font-size: 24px;
+        margin: 10px;
       }
 
       button {
-	  position: fixed;
-	  top: 0;
-	  left: 0;
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        color: white;
+        background-color: black;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
       }
     </style>
   </head>
   <body>
-    <!-- Basic Cloud Vision (Google) Demo -->
+    <!-- Load TensorFlow.js and coco-ssd model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <!-- Video element for displaying the camera feed -->
+    <video id="video" width="640" height="480" autoplay></video>
 
+    <!-- Button to analyze the video frame -->
+    <button id="analyzeButton">Analyze</button>
 
-    <video autoplay="true" id="videoElement"></video>
-    <button id="vision_button">Analyze</button>
-    <div id='results'></div>
-    
+    <!-- Container to display predictions -->
+    <div id="predictions" style="display: none"></div>
+
     <script>
+      const video = document.getElementById("video");
+      const analyzeButton = document.getElementById("analyzeButton");
+      const predictionsContainer = document.getElementById("predictions");
+      let model;
 
- 
-  // Load the COCO-SSD model
-  async function loadModel() {
-    const model = await cocoSsd.load();
-    console.log("Model loaded");
-    return model;
-  }
-
-  // Perform object detection
-  async function detectObjects(imageElement, model) {
-    const predictions = await model.detect(imageElement);
-    return predictions;
-  }
-
-  // Display predictions
-  function displayPredictions(predictions, canvas) {
-    const ctx = canvas.getContext("2d");
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    predictions.forEach(prediction => {
-      const [x, y, width, height] = prediction.bbox;
-      ctx.strokeStyle = "green";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x, y, width, height);
-
-      ctx.fillStyle = "green";
-      ctx.font = "16px Arial";
-      ctx.fillText(`${prediction.class} (${Math.round(prediction.score * 100)}%)`, x, y - 10);
-    });
-  }
-
-  // Main function
-  async function main() {
-    // Load the model
-    const model = await loadModel();
-
-    // Image element to process
-    const imageElement = document.getElementById("uploaded-image");
-    const canvas = document.getElementById("overlay");
-
-    // Perform detection when the image loads
-    imageElement.onload = async () => {
-      const predictions = await detectObjects(imageElement, model);
-      console.log(predictions); // Log predictions for debugging
-      displayPredictions(predictions, canvas);
-    };
-
-    // Load user-uploaded image
-    document.getElementById("file-input").addEventListener("change", event => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        imageElement.src = e.target.result;
-      };
-      reader.readAsDataURL(event.target.files[0]);
-    });
-  }
-
-  // Run the main function
-  main();
- 
-
-
-      // Access camera 
-      var video = document.querySelector("#videoElement");      
-      if (navigator.mediaDevices.getUserMedia) {       
-	  navigator.mediaDevices.getUserMedia({video: true})
-	      .then(function(stream) {
-		  video.srcObject = stream;
-	      })
-	      .catch(function(err) {
-		  console.log("Something went wrong!");
-	      });
-      }
-
-      // We only get to work when the vision button is clicked
-      document.querySelector("#vision_button").addEventListener('click', evt => {
-	  // extract image as base64, scale it down to reduce data transfer speed	  
-	  var scale = 0.25;
-	  var canvas = document.createElement("canvas");
-          canvas.width = video.videoWidth * scale;
-          canvas.height = video.videoHeight * scale;
-          canvas.getContext('2d')
-              .drawImage(video, 0, 0, canvas.width, canvas.height);
-
-	  // dataUrl contains base64 version of image
-          var dataUrl = canvas.toDataURL();
-
-	  // Send image to google to analyze
-	  // Documentation of the annotate feature: https://cloud.google.com/vision/docs/reference/rest/v1/images/annotate 
-	  fetch('https://vision.googleapis.com/v1/images:annotate?key=AIzaSyDACD6cU-MaB5cCmYTuxitVn3us5_wVTAI', {
-	      method: 'POST',
-	      headers: {
-		  'Content-Type': 'application/json'
-	      },
-	      body: JSON.stringify({
-		  requests: [
-		      {
-			  features: {
-			      type: 'LABEL_DETECTION'
-			  },
-			  image: {
-			      // have to extract only the image data from dataURL
-			      content: dataUrl.substring('data:image/png;base64,'.length)
-			  }
-		      }
-		  ]
-	      })
-	  }).then( resp => {
-	      return resp.json();
-	  }).then( json => {
-	      // Simply output the response
-	      console.log(json);
-	      results.innerHTML = '';
-	      json.responses[0].labelAnnotations.forEach( annotation => {
-		  let description = document.createElement('span');
-		  let score = document.createElement('span');
-
-		  let div = document.createElement('div');
-		  description.innerText = annotation.description;
-		  score.innerText = annotation.score;
-
-		  div.append(description,score);
-
-		  results.append(div);
-	      });
-	  });
+      cocoSsd.load().then((loadedModel) => {
+        model = loadedModel;
+        console.log("Model loaded.");
       });
-      
+
+      navigator.mediaDevices
+        .getUserMedia({ video: true })
+        .then((stream) => {
+          video.srcObject = stream;
+        })
+        .catch((error) => {
+          console.error("Error accessing the camera: ", error);
+        });
+
+      function analyzeFrame() {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext("2d");
+
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        model.detect(canvas).then((predictions) => {
+          predictionsContainer.innerHTML = "";
+
+          predictions.forEach((prediction) => {
+            const p = document.createElement("p");
+            p.innerText = `${prediction.class} - ${prediction.score}`;
+            predictionsContainer.appendChild(p);
+          });
+
+          console.log("Predictions: ", predictions);
+          predictionsContainer.style.display = "block";
+        });
+      }
+      analyzeButton.addEventListener("click", analyzeFrame);
     </script>
   </body>
 </html>
